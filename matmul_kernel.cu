@@ -1,49 +1,40 @@
 #include <cuda_runtime.h>
-#include <stdio.h>
-#include <chrono>
+#include <torch/extension.h>
+#include <ATen/cuda/CUDAContext.h>  // good for stream handling
 
-__global__ void matmul(float *A, float *B, float *C, int N) {
+__global__ void matmul_kernel(const float* A, const float* B, float* C, int M, int K, int N) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
-    if (row < N && col < N) {
+
+    if (row < M && col < N) {
         float sum = 0.0f;
-        for (int k = 0; k < N; ++k) {
-            sum += A[row * N + k] * B[k * N + col];
+        for (int i = 0; i < K; ++i) {
+            sum += A[row * K + i] * B[i * N + col];
         }
         C[row * N + col] = sum;
     }
 }
 
-extern "C" void launch_matmul(float *A, float *B, float *C, int N) {
-    float *d_A, *d_B, *d_C;
-    size_t size = N * N * sizeof(float);
+// Updated to accept dynamic block configuration
+void matmul_launcher(torch::Tensor A, torch::Tensor B, torch::Tensor C, int block_x, int block_y) {
+    TORCH_CHECK(A.device().is_cuda(), "A must be a CUDA tensor");
+    TORCH_CHECK(B.device().is_cuda(), "B must be a CUDA tensor");
+    TORCH_CHECK(C.device().is_cuda(), "C must be a CUDA tensor");
 
-    cudaMalloc(&d_A, size);
-    cudaMalloc(&d_B, size);
-    cudaMalloc(&d_C, size);
+    int M = A.size(0);
+    int K = A.size(1);
+    int N = B.size(1);
 
-    cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
+    const float* A_ptr = A.data_ptr<float>();
+    const float* B_ptr = B.data_ptr<float>();
+    float* C_ptr = C.data_ptr<float>();
 
-    dim3 threadsPerBlock(16, 16);
-    dim3 numBlocks((N + 15) / 16, (N + 15) / 16);
+    dim3 threadsPerBlock(block_x, block_y);
+    dim3 numBlocks((N + block_x - 1) / block_x, (M + block_y - 1) / block_y);
 
-    cudaEvent_t start, stop;
-    float milliseconds = 0;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    matmul_kernel<<<numBlocks, threadsPerBlock>>>(A_ptr, B_ptr, C_ptr, M, K, N);
 
-    cudaEventRecord(start);
-    matmul<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, N);
-    cudaEventRecord(stop);
-
-    cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
-
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    printf("GPU Matrix Multiplication Time: %.4f ms\n", milliseconds);
-
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
+    // Optional: error check
+    cudaError_t err = cudaGetLastError();
+    TORCH_CHECK(err == cudaSuccess, "CUDA kernel launch failed: ", cudaGetErrorString(err));
 }
