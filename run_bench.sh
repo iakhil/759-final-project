@@ -8,24 +8,28 @@
 #SBATCH --mem=16G
 
 module load nvidia/cuda/11.8.0
+
 VENV_DIR=$HOME/759-final-project/.venv
 PYTHON=$VENV_DIR/bin/python
 PIP=$VENV_DIR/bin/pip
 
-# Check if venv exists
+# Create virtualenv if needed
 if [ ! -d "$VENV_DIR" ]; then
   python3 -m venv $VENV_DIR
-  $VENV_DIR/bin/pip install --upgrade pip
-  $VENV_DIR/bin/pip install -r requirements.txt
+  $PIP install --upgrade pip
+  $PIP install -r requirements.txt
 fi
 
-# Fix: Set CUDA_HOME
-export CUDA_HOME=/usr/local/cuda
+# Print CUDA info
+echo "nvcc path: $(which nvcc)"
+export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
+echo "CUDA_HOME: $CUDA_HOME"
 
-# Confirm libraries
+# Confirm torch + CUDA
 $PYTHON -c "import torch, numpy; print('Torch:', torch.__version__, '| NumPy:', numpy.__version__)"
+$PYTHON -c "import torch; print('CUDA available:', torch.cuda.is_available())"
 
-# Build CUDA extension
+# Build extension
 $PYTHON setup.py build_ext --inplace
 
 # Run benchmark
