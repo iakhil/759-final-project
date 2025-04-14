@@ -5,11 +5,11 @@ from torch.utils.cpp_extension import load
 
 matmul = load(
     name="matmul_cuda",
-    sources=["matmul_kernel.cu"],  # Save your C++/CUDA code in this file
+    sources=["matmul_kernel.cu"], 
     verbose=True
 )
 
-M, K, N = 1024, 1024, 1024  # adjust for testing scale
+M, K, N = 1024, 1024, 1024  
 A = torch.randn(M, K, device='cuda')
 B = torch.randn(K, N, device='cuda')
 C = torch.zeros(M, N, device='cuda')
