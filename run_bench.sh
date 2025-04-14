@@ -7,7 +7,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --mem=16G
 
-module load nvidia/cuda/11.8.0
+module load nvidia/nvhpc-hpcx-cuda12/24.5
+
 
 VENV_DIR=$HOME/759-final-project/.venv
 PYTHON=$VENV_DIR/bin/python
