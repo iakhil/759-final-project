@@ -15,6 +15,11 @@ unset CUDA_HOME
 module purge
 module load nvidia/cuda/12.2.0
 
+# Load compatible GCC version for CUDA 12.2
+module load gcc/11.2.0
+export CC=gcc
+export CXX=g++
+
 # Define virtual environment paths
 VENV_DIR=$HOME/759-final-project/.venv
 PYTHON=$VENV_DIR/bin/python
@@ -24,7 +29,11 @@ PIP=$VENV_DIR/bin/pip
 export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-export TORCH_CUDA_ARCH_LIST="8.0"  # Update if you know your GPU arch
+export TORCH_CUDA_ARCH_LIST="8.0"  # Update if needed
+
+# Ensure Python headers are found
+PYTHON_INCLUDE_DIR=$($PYTHON -c "from sysconfig import get_paths; print(get_paths()['include'])")
+export CFLAGS="-I$PYTHON_INCLUDE_DIR"
 
 # Avoid using ninja (switch to Makefiles)
 export CMAKE_GENERATOR="Unix Makefiles"
