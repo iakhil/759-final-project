@@ -2,7 +2,7 @@
 #SBATCH --job-name=mnist_benchmark
 #SBATCH --output=mnist_benchmark.out
 #SBATCH --error=mnist_benchmark.err
-#SBATCH --partition=interactive
+#SBATCH --partition=instruction
 #SBATCH --gres=gpu:1
 #SBATCH --time=00:30:00
 #SBATCH --mem=16G
