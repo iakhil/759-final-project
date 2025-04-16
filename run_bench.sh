@@ -26,6 +26,9 @@ export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 export TORCH_CUDA_ARCH_LIST="8.0"  # Update if you know your GPU arch
 
+# Avoid using ninja (switch to Makefiles)
+export CMAKE_GENERATOR="Unix Makefiles"
+
 echo "CUDA_HOME: $CUDA_HOME"
 echo "nvcc path: $(which nvcc)"
 nvidia-smi
@@ -45,8 +48,9 @@ fi
 # Confirm torch sees GPU
 $PYTHON -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count()); print('Device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
 
-# Build C++/CUDA extension
-$PYTHON setup.py build_ext --inplace
+# Clean and build C++/CUDA extension
+$PYTHON setup.py clean
+$PYTHON setup.py build_ext --inplace --verbose
 
 # Run your code
 $PYTHON benchmark_layer.py
