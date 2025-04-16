@@ -11,31 +11,33 @@
 unset CUDA_VISIBLE_DEVICES
 unset CUDA_HOME
 
-# Load compatible CUDA version
+# Load compatible CUDA and GCC versions
 module purge
 module load nvidia/cuda/12.2.0
-
-# Load compatible GCC version for CUDA 12.2
 module load gcc/11.2.0
+
 export CC=gcc
 export CXX=g++
+export TORCH_CUDA_NVCC_FLAGS="-ccbin=$(which gcc)"
 
 # Define virtual environment paths
 VENV_DIR=$HOME/759-final-project/.venv
 PYTHON=$VENV_DIR/bin/python
 PIP=$VENV_DIR/bin/pip
 
-# Set CUDA-related environment variables
+# Set CUDA environment
 export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-export TORCH_CUDA_ARCH_LIST="8.0"  # Update if needed
+export TORCH_CUDA_ARCH_LIST="8.0"
 
-# Ensure Python headers are found
+# Set Python include flags
 PYTHON_INCLUDE_DIR=$($PYTHON -c "from sysconfig import get_paths; print(get_paths()['include'])")
-export CFLAGS="-I$PYTHON_INCLUDE_DIR"
+export CPATH="$PYTHON_INCLUDE_DIR:$CPATH"
+export CFLAGS="$CFLAGS -I$PYTHON_INCLUDE_DIR"
+export CXXFLAGS="$CXXFLAGS -I$PYTHON_INCLUDE_DIR"
 
-# Avoid using ninja (switch to Makefiles)
+# Use Makefiles instead of ninja
 export CMAKE_GENERATOR="Unix Makefiles"
 
 echo "CUDA_HOME: $CUDA_HOME"
@@ -54,12 +56,12 @@ if [ ! -d "$VENV_DIR" ]; then
   $PIP install -r requirements.txt
 fi
 
-# Confirm torch sees GPU
+# Confirm GPU availability
 $PYTHON -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count()); print('Device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
 
-# Clean and build C++/CUDA extension
+# Build extension
 $PYTHON setup.py clean
 $PYTHON setup.py build_ext --inplace --verbose
 
-# Run your code
+# Run benchmark
 $PYTHON benchmark_layer.py
