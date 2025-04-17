@@ -1,0 +1,11 @@
+torch==2.2.1
+torchvision==0.17.1
+numpy>=1.21
+setuptools>=65.0.0
+wheel
+tqdm
+pillow
+scipy
+matplotlib
+numpy
+pandas
