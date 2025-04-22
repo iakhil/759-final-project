@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from torch.autograd import Function
-import matmul_cuda  # Compiled with CUDA kernel
+import matmul_cuda  # Your custom CUDA kernel
+from tuner_model import predict_best_block_size  # Make sure this is imported
 
 class MatMulFunction(Function):
     @staticmethod
@@ -25,13 +26,26 @@ class MatMulFunction(Function):
         return grad_A, grad_B, None, None
 
 class CustomLinear(nn.Module):
-    def __init__(self, in_features, out_features, block_x=16, block_y=16):
+    def __init__(self, in_features, out_features, tuner_model, scaler):
         super(CustomLinear, self).__init__()
         self.weight = nn.Parameter(torch.randn(in_features, out_features) * 0.01)
         self.bias = nn.Parameter(torch.zeros(out_features))
-        self.block_x = block_x
-        self.block_y = block_y
+        self.tuner_model = tuner_model
+        self.scaler = scaler
+        self.in_features = in_features
+        self.out_features = out_features
 
     def forward(self, x):
-        out = MatMulFunction.apply(x, self.weight, self.block_x, self.block_y)
+        # Get matrix dimensions
+        M = x.shape[0]
+        K = self.in_features
+        N = self.out_features
+
+        # Use the tuner to get best block sizes for this (M, K, N)
+        block_x, block_y, _ = predict_best_block_size(M, K, N, self.tuner_model, self.scaler)
+        block_x = int(block_x)
+        block_y = int(block_y)
+
+        # Call the CUDA kernel with tuned block sizes
+        out = MatMulFunction.apply(x, self.weight, block_x, block_y)
         return out + self.bias

@@ -30,16 +30,43 @@ class MatMulFunction(Function):
         return grad_A, grad_B, None, None  # block_x and block_y don't require gradients
 
 class CustomLinear(nn.Module):
-    def __init__(self, in_features, out_features, block_x=16, block_y=16):
+    def __init__(self, in_features, out_features, tuner_model=None, default_block_x=16, default_block_y=16):
         super(CustomLinear, self).__init__()
         self.weight = nn.Parameter(torch.randn(in_features, out_features) * 0.01)
         self.bias = nn.Parameter(torch.zeros(out_features))
-        self.block_x = block_x
-        self.block_y = block_y
+        self.tuner_model = tuner_model
+        self.default_block_x = default_block_x
+        self.default_block_y = default_block_y
+        
+        # Fixed properties for the tuner
+        self.in_features = in_features
+        self.out_features = out_features
+
+    def get_block_sizes(self, batch_size):
+        if self.tuner_model is not None:
+            # Create input tensor: [batch_size, in_features, out_features]
+            tuner_input = torch.tensor([batch_size, self.in_features, self.out_features], 
+                                     dtype=torch.float32, device=self.weight.device).unsqueeze(0)
+            
+            # Get predicted block sizes
+            with torch.no_grad():
+                block_sizes = self.tuner_model(tuner_input).squeeze()
+            
+            # Convert to integers and ensure they're positive
+            block_x = max(1, int(block_sizes[0].item()))
+            block_y = max(1, int(block_sizes[1].item()))
+            return block_x, block_y
+        return self.default_block_x, self.default_block_y
 
     def forward(self, x):
         x = x.contiguous()  # Make sure x is contiguous
         weight = self.weight.contiguous()
-        out = MatMulFunction.apply(x, weight, self.block_x, self.block_y)
+        
+        # Get batch size (M dimension)
+        batch_size = x.size(0)
+        
+        # Get optimal block sizes for this batch
+        block_x, block_y = self.get_block_sizes(batch_size)
+        
+        out = MatMulFunction.apply(x, weight, block_x, block_y)
         return out + self.bias
-
