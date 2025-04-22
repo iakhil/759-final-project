@@ -19,7 +19,7 @@ class KernelTuner(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-def train_and_save_model(csv_path='benchmark_results_light.csv', model_path='tuner_model.pt'):
+def train_and_save_model(csv_path='matmul_results.csv', model_path='tuner_model.pt'):
     df = pd.read_csv(csv_path)
     # Feature engineering
     eps = 1e-8
@@ -36,7 +36,7 @@ def train_and_save_model(csv_path='benchmark_results_light.csv', model_path='tun
                 'M_div_block_x', 'M_div_block_y',
                 'block_x_div_block_y', 'block_y_div_block_x']
     X = df[features].values
-    y = df['runtime_ms'].values
+    y = df['time_taken_ms'].values
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -128,8 +128,8 @@ if __name__ == '__main__':
     train_and_save_model()
 
     # Use constant K and N from your dataset
-    K = 784
-    N = 256
+    K = 128
+    N = 128
     M = 128  # Change as needed
 
     model, scaler = load_model_and_scaler('tuner_model.pt', input_dim=12)
