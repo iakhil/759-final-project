@@ -1,0 +1,64 @@
+
+CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'.
+To initialize your shell, run
+
+    $ conda init <SHELL_NAME>
+
+Currently supported shells are:
+  - bash
+  - fish
+  - tcsh
+  - xonsh
+  - zsh
+  - powershell
+
+See 'conda init --help' for more information and options.
+
+IMPORTANT: You may need to close and restart your shell after running 'conda init'.
+
+
+
+
+==> WARNING: A newer version of conda exists. <==
+  current version: 23.1.0
+  latest version: 25.3.1
+
+Please update conda by running
+
+    $ conda update -n base -c conda-forge conda
+
+Or to minimize the number of packages updated during conda update use
+
+     conda install conda=25.3.1
+
+
+
+CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'.
+To initialize your shell, run
+
+    $ conda init <SHELL_NAME>
+
+Currently supported shells are:
+  - bash
+  - fish
+  - tcsh
+  - xonsh
+  - zsh
+  - powershell
+
+See 'conda init --help' for more information and options.
+
+IMPORTANT: You may need to close and restart your shell after running 'conda init'.
+
+
+/srv/home/nagendra2/.local/lib/python3.10/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: CUDA unknown error - this may be due to an incorrectly set up environment, e.g. changing env variable CUDA_VISIBLE_DEVICES after program start. Setting the available devices to be zero. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+  return torch._C._cuda_getDeviceCount() > 0
+No CUDA runtime is found, using CUDA_HOME='/opt/apps/nvidia/cuda/12.2.0'
+ninja: /opt/apps/mamba/x86_64/23.1.0/lib/libstdc++.so.6: version `GLIBCXX_3.4.32' not found (required by ninja)
+/srv/home/nagendra2/.local/lib/python3.10/site-packages/torch/utils/cpp_extension.py:529: UserWarning: Attempted to use ninja as the BuildExtension backend but we could not find ninja.. Falling back to using the slow distutils backend.
+  warnings.warn(msg.format('we could not find ninja.'))
+error: [Errno 2] No such file or directory: '/opt/apps/nvidia/cuda/12.2.0/bin/nvcc'
+Traceback (most recent call last):
+  File "/srv/home/nagendra2/repo759/Project759/newdata/matmul_bench.py", line 6, in <module>
+    from matmul_cuda import launch_matmul
+ModuleNotFoundError: No module named 'matmul_cuda'
