@@ -107,7 +107,7 @@ def load_model_and_scaler(model_path='tuner_model.pt', input_dim=12):
     scaler.scale_ = checkpoint['scaler_scale']
     return model, scaler
 
-def predict_best_block_size(M, K, N, model, scaler, block_sizes=[4, 8, 16, 32], device="cpu"):
+def predict_best_block_size(M, K, N, model, scaler, block_sizes= list(range(1,33)), device="cpu"):
     candidates = []
     eps = 1e-8
     for block_x in block_sizes:
