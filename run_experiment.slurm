@@ -40,4 +40,3 @@ echo "Running prediction experiment..."
 python run_prediction_experiments.py --epochs 2 --batch_size 64
 
 echo "Job completed at $(date)"
-
