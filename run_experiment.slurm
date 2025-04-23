@@ -33,6 +33,8 @@ pip install -r requirements.txt
 # Build CUDA extension using setup.py from Single layer Working model
 echo "Building CUDA extension from Single layer Working model..."
 cd "Single layer Working model"
+# Disable Ninja build system to avoid related issues
+export USE_NINJA=0
 python setup.py install
 cd ..
 
