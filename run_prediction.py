@@ -2,8 +2,7 @@ import torch
 import os
 import sys
 
-sys.path.append("Single layer Working model")
-from tuner_model import load_model_and_scaler, predict_best_block_size
+from tuner_model_copy import load_model_and_scaler, predict_best_block_size
 
 # Matrix dimensions for the first layer
 M = 64  # batch size
@@ -14,7 +13,7 @@ print(f"Predicting optimal block sizes for matrix dimensions: M={M}, K={K}, N={N
 
 # Load tuner model and scaler
 try:
-    model_path = "tuner_model.pt"
+    model_path = "Single layer Working model/tuner_model.pt"
     if not os.path.exists(model_path):
         print(f"Warning: Model file {model_path} not found. Checking in alternative locations...")
         
