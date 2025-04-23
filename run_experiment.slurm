@@ -30,9 +30,11 @@ source venv/bin/activate
 echo "Installing requirements..."
 pip install -r requirements.txt
 
-# Build CUDA extension
-echo "Building CUDA extension..."
+# Build CUDA extension using setup.py from Single layer Working model
+echo "Building CUDA extension from Single layer Working model..."
+cd "Single layer Working model"
 python setup.py install
+cd ..
 
 # Now run both models:
 # 1. First predict optimal block sizes using the tuner model
