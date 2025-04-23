@@ -76,7 +76,7 @@ def train_and_save_model(csv_path='matmul_results.csv', model_path='tuner_model.
         abs_errors = torch.abs(test_outputs - y_test)
         mae = abs_errors.mean().item()
         # Accuracy within ±0.1 ms
-        accuracy = (abs_errors <= 0.1).sum().item() / len(y_test)
+        accuracy = (abs_errors <= 0.05).sum().item() / len(y_test)
 
         print(f'\nTest Results:')
         print(f'Test Loss: {test_loss.item():.4f}')
