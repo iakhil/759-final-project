@@ -15,8 +15,7 @@ nvidia-smi
 # Set up environment
 echo "Setting up Python environment..."
 module purge  # Clear any existing modules
-module load python/3.10  
-module load cuda/11.8.0  
+module load nvidia/cuda/12.2.0
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
