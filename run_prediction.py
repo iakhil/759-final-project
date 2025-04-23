@@ -1,5 +1,6 @@
 import torch
 import os
+import sys
 from tuner_model import load_model_and_scaler, predict_best_block_size
 
 # Matrix dimensions for the first layer
@@ -22,7 +23,10 @@ try:
                 print(f"Found model at {model_path}")
                 break
         else:
-            raise FileNotFoundError(f"Could not find tuner_model.pt in any subdirectory")
+            print("ERROR: Could not find tuner_model.pt in any subdirectory", file=sys.stderr)
+            # Fall back to default block sizes
+            print("PREDICTION_RESULT: block_x=16, block_y=16")
+            sys.exit(1)
     
     # Device configuration
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,11 +41,12 @@ try:
     best_bx, best_by, predicted_runtime = predict_best_block_size(
         M, K, N, model, scaler, device=device
     )
-    print(f"Predicted optimal block sizes: block_x={best_bx}, block_y={best_by}")
+    # Print in a consistent format that's easy to parse
+    print(f"PREDICTION_RESULT: block_x={best_bx}, block_y={best_by}")
     print(f"Predicted runtime: {predicted_runtime:.4f} ms")
     
 except Exception as e:
-    print(f"Error in prediction: {e}")
-    # Default block sizes if prediction fails
-    best_bx, best_by = 16, 16
-    print(f"Using default block sizes: block_x={best_bx}, block_y={best_by}") 
+    print(f"ERROR in prediction: {e}", file=sys.stderr)
+    # Fall back to default block sizes
+    print("PREDICTION_RESULT: block_x=16, block_y=16")
+    sys.exit(1) 

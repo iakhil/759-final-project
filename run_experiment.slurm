@@ -38,13 +38,24 @@ python setup.py install
 # Now run both models:
 # 1. First predict optimal block sizes using the tuner model
 echo "Predicting optimal block sizes..."
-python run_prediction.py > block_prediction.txt
+# Run the prediction script and save its complete output
+python run_prediction.py 2>&1 | tee prediction_output.txt
 
-# Extract predicted block sizes
-BLOCK_X=$(grep "block_x=" block_prediction.txt | tail -1 | awk '{print $3}' | cut -d'=' -f2 | cut -d',' -f1)
-BLOCK_Y=$(grep "block_y=" block_prediction.txt | tail -1 | awk '{print $4}' | cut -d'=' -f2)
+# Default block sizes in case extraction fails
+BLOCK_X=16
+BLOCK_Y=16
 
-echo "Using block sizes: $BLOCK_X, $BLOCK_Y"
+# Extract block sizes if possible - look for the PREDICTION_RESULT format
+if grep -q "PREDICTION_RESULT:" prediction_output.txt; then
+    PREDICTION_LINE=$(grep "PREDICTION_RESULT:" prediction_output.txt | tail -1)
+    BLOCK_X=$(echo $PREDICTION_LINE | grep -o 'block_x=[0-9]*' | cut -d'=' -f2)
+    BLOCK_Y=$(echo $PREDICTION_LINE | grep -o 'block_y=[0-9]*' | cut -d'=' -f2)
+    echo "Successfully extracted block sizes from prediction output"
+else
+    echo "Could not extract block sizes from prediction output, using defaults"
+fi
+
+echo "Using block sizes: BLOCK_X=$BLOCK_X, BLOCK_Y=$BLOCK_Y"
 
 # 2. Run the standard MLP model
 echo "Running standard MLP model..."
@@ -56,6 +67,7 @@ python mlp_with_custom_layer.py --epochs 5 --batch_size 64 --block_x $BLOCK_X --
 
 # Print summary of results
 echo "===== EXPERIMENT SUMMARY ====="
+echo "Block sizes used: BLOCK_X=$BLOCK_X, BLOCK_Y=$BLOCK_Y"
 echo "Standard MLP results:"
 grep "STANDARD MLP PERFORMANCE" -A 5 standard_mlp_output.txt
 
