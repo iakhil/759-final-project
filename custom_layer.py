@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 import matmul_cuda  # Your custom CUDA kernel
-from tuner_model import predict_best_block_size  # Make sure this is imported
+from tuner_model_copy import predict_best_block_size  # Make sure this is imported
 
 class MatMulFunction(Function):
     @staticmethod
