@@ -2,8 +2,8 @@
 #SBATCH --job-name=mlp_tuner_experiment
 #SBATCH --output=mlp_tuner_results.out
 #SBATCH --error=mlp_tuner_errors.err
-#SBATCH --time=01:00:00
-#SBATCH --partition=gpu
+#SBATCH --time=00:30:00
+#SBATCH --partition=instruction
 #SBATCH --gres=gpu:1
 #SBATCH --mem=8G
 
@@ -15,8 +15,8 @@ nvidia-smi
 # Set up environment
 echo "Setting up Python environment..."
 module purge  # Clear any existing modules
-module load python/3.8  # Adjust as needed for your cluster
-module load cuda/11.7.0  # Adjust version as needed for your cluster
+module load python/3.8  
+module load cuda/11.7.0  
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
