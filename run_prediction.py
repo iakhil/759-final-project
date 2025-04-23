@@ -1,6 +1,8 @@
 import torch
 import os
 import sys
+
+sys.path.append("Single layer Working model")
 from tuner_model import load_model_and_scaler, predict_best_block_size
 
 # Matrix dimensions for the first layer
