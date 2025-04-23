@@ -16,6 +16,7 @@ nvidia-smi
 echo "Setting up Python environment..."
 module purge  # Clear any existing modules
 module load nvidia/cuda/12.2.0
+module load gcc/11.3.0  # Add gcc module like in the working script
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
@@ -33,10 +34,15 @@ pip install -r requirements.txt
 # Build CUDA extension using setup.py from Single layer Working model
 echo "Building CUDA extension from Single layer Working model..."
 cd "Single layer Working model"
-# Disable Ninja build system to avoid related issues
-export USE_NINJA=0
-python setup.py install
+
+# Use build_ext --inplace approach like in the working script
+python setup.py build_ext --inplace
+
+# Go back to the main directory
 cd ..
+
+# Make sure Python can find the extension
+export PYTHONPATH=$PYTHONPATH:"$(pwd)/Single layer Working model"
 
 # Now run both models:
 # 1. First predict optimal block sizes using the tuner model
@@ -72,9 +78,9 @@ python mlp_with_custom_layer.py --epochs 5 --batch_size 64 --block_x $BLOCK_X --
 echo "===== EXPERIMENT SUMMARY ====="
 echo "Block sizes used: BLOCK_X=$BLOCK_X, BLOCK_Y=$BLOCK_Y"
 echo "Standard MLP results:"
-grep "STANDARD MLP PERFORMANCE" -A 5 standard_mlp_output.txt
+grep "STANDARD MLP PERFORMANCE" -A 5 standard_mlp_output.txt || echo "No standard MLP results found"
 
 echo "Custom MLP results:"
-grep "CUSTOM MLP PERFORMANCE" -A 5 custom_mlp_output.txt
+grep "CUSTOM MLP PERFORMANCE" -A 5 custom_mlp_output.txt || echo "No custom MLP results found"
 
 echo "Experiment completed at $(date)"
