@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=mlp_tuner
+#SBATCH --job-name=mlp_tuner_experiment
 #SBATCH --output=mlp_tuner_results.out
 #SBATCH --error=mlp_tuner_errors.err
 #SBATCH --time=01:00:00
@@ -9,7 +9,7 @@
 
 # Print node information
 echo "Running on host: $(hostname)"
-echo "GPU information:"
+echo "CUDA devices:"
 nvidia-smi
 
 # Set up environment
@@ -35,8 +35,31 @@ pip install -r requirements.txt
 echo "Building CUDA extension..."
 python setup.py install
 
-# Run prediction experiment
-echo "Running prediction experiment..."
-python run_prediction_experiments.py --epochs 2 --batch_size 64
+# Now run both models:
+# 1. First predict optimal block sizes using the tuner model
+echo "Predicting optimal block sizes..."
+python run_prediction.py > block_prediction.txt
 
-echo "Job completed at $(date)"
+# Extract predicted block sizes
+BLOCK_X=$(grep "block_x=" block_prediction.txt | tail -1 | awk '{print $3}' | cut -d'=' -f2 | cut -d',' -f1)
+BLOCK_Y=$(grep "block_y=" block_prediction.txt | tail -1 | awk '{print $4}' | cut -d'=' -f2)
+
+echo "Using block sizes: $BLOCK_X, $BLOCK_Y"
+
+# 2. Run the standard MLP model
+echo "Running standard MLP model..."
+python mlp.py --epochs 5 --batch_size 64 > standard_mlp_output.txt
+
+# 3. Run the custom MLP model with predicted block sizes
+echo "Running custom MLP model with predicted block sizes..."
+python mlp_with_custom_layer.py --epochs 5 --batch_size 64 --block_x $BLOCK_X --block_y $BLOCK_Y > custom_mlp_output.txt
+
+# Print summary of results
+echo "===== EXPERIMENT SUMMARY ====="
+echo "Standard MLP results:"
+grep "STANDARD MLP PERFORMANCE" -A 5 standard_mlp_output.txt
+
+echo "Custom MLP results:"
+grep "CUSTOM MLP PERFORMANCE" -A 5 custom_mlp_output.txt
+
+echo "Experiment completed at $(date)"

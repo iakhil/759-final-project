@@ -8,6 +8,8 @@ from tuner_model import load_model_and_scaler, predict_best_block_size
 import time
 import csv
 import os
+import argparse
+import torch.cuda
 
 class MLP(nn.Module):
     def __init__(self, input_size=784, hidden_size=256, tuner_path="tuner_model.pt"):
@@ -39,13 +41,21 @@ class MLP(nn.Module):
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Hyperparameters
-input_size = 784
-hidden_size = 256
-num_classes = 10
-num_epochs = 5
-batch_size = 64
-learning_rate = 0.001
+# Add command-line argument parsing
+parser = argparse.ArgumentParser(description='Train an MLP with custom layer on MNIST')
+parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
+parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
+parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+parser.add_argument('--block_x', type=int, default=16, help='Block size x dimension')
+parser.add_argument('--block_y', type=int, default=16, help='Block size y dimension')
+args = parser.parse_args()
+
+# Update hyperparameters
+num_epochs = args.epochs
+batch_size = args.batch_size
+learning_rate = args.lr
+block_x = args.block_x
+block_y = args.block_y
 
 # Load MNIST dataset
 transform = transforms.ToTensor()
@@ -56,7 +66,7 @@ train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=
 test_loader  = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
 
 # Initialize model
-model = MLP(input_size, hidden_size, tuner_path="tuner_model.pt").to(device)
+model = MLP(input_size=784, hidden_size=256, tuner_path="tuner_model.pt").to(device)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
@@ -69,23 +79,59 @@ with open(csv_path, "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerow(["epoch", "batch", "loss", "time_ms"])
 
-    for epoch in range(num_epochs):
-        model.train()
-        for batch_idx, (images, labels) in enumerate(train_loader):
-            images, labels = images.to(device), labels.to(device)
+# Add timing variables
+start_time = time.time()
+epoch_times = []
+forward_times = []
+backward_times = []
 
-            batch_start = time.time()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+for epoch in range(num_epochs):
+    epoch_start = time.time()
+    model.train()
+    for batch_idx, (images, labels) in enumerate(train_loader):
+        images, labels = images.to(device), labels.to(device)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            batch_end = time.time()
+        # Time forward pass
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        
+        start_event.record()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        end_event.record()
+        
+        torch.cuda.synchronize()
+        forward_times.append(start_event.elapsed_time(end_event))
+        
+        # Time backward pass
+        start_event.record()
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        end_event.record()
+        
+        torch.cuda.synchronize()
+        backward_times.append(start_event.elapsed_time(end_event))
 
-            writer.writerow([epoch+1, batch_idx+1, loss.item(), (batch_end - batch_start)*1000])
+        writer.writerow([epoch+1, batch_idx+1, loss.item(), (end_event.elapsed_time(start_event)*1000)])
 
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
+    epoch_end = time.time()
+    epoch_time = epoch_end - epoch_start
+    epoch_times.append(epoch_time)
+    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Time: {epoch_time:.2f}s")
+
+# After training, add timing statistics
+total_time = time.time() - start_time
+avg_epoch_time = sum(epoch_times) / len(epoch_times)
+avg_forward_time = sum(forward_times) / len(forward_times)
+avg_backward_time = sum(backward_times) / len(backward_times)
+
+print("\n===== CUSTOM MLP PERFORMANCE =====")
+print(f"Block size configuration: ({block_x}, {block_y})")
+print(f"Total training time: {total_time:.2f} seconds")
+print(f"Average epoch time: {avg_epoch_time:.2f} seconds")
+print(f"Average forward pass time: {avg_forward_time:.2f} ms")
+print(f"Average backward pass time: {avg_backward_time:.2f} ms")
 
 # Evaluation
 model.eval()
