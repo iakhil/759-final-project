@@ -7,29 +7,31 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=8G
 
+# Print node information
+echo "Running on host: $(hostname)"
+echo "CUDA devices:"
+nvidia-smi
+
 # Load required modules
 echo "Loading modules..."
 module purge
 module load nvidia/cuda/12.2.0
-time module load gcc/11.3.0
+module load gcc/11.3.0
 module load conda/miniforge/23.1.0
 
-# Activate conda environment
-echo "Activating Conda environment..."
-source ~/.bashrc
-conda activate myenv || (conda create -n myenv python=3.10 -y && conda activate myenv)
-
-# Remove ninja to prevent its use
-echo "Removing ninja from environment..."
-conda remove -y ninja || echo "ninja not installed, skipping removal"
+# Activate conda environment without relying on .bashrc
+echo "Setting up Conda environment..."
+eval "$(conda shell.bash hook)"
+conda activate myenv 2>/dev/null || conda create -n myenv python=3.10 -y && conda activate myenv
 
 # Explicitly disable Ninja for PyTorch extensions
 export USE_NINJA=0
+export TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0"
 
 # Install Python packages
 echo "Installing Python packages..."
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install torch torchvision numpy pandas scikit-learn setuptools
 
 # Confirm environment
 python -c "import torch, numpy; print('Torch:', torch.__version__, '| NumPy:', numpy.__version__)"
@@ -65,9 +67,12 @@ echo "Using block sizes: BLOCK_X=$BLOCK_X, BLOCK_Y=$BLOCK_Y"
 echo "Running standard MLP..."
 python mlp.py --epochs 5 --batch_size 64 > standard_mlp_output.txt
 
-# 3. Run custom MLP
-echo "Running custom MLP with block_x=$BLOCK_X, block_y=$BLOCK_Y..."
-python mlp_with_custom_layer.py --epochs 5 --batch_size 64 --block_x $BLOCK_X --block_y $BLOCK_Y > custom_mlp_output.txt
+# 3. Run custom MLP from Single layer Working model
+echo "Running custom MLP from Single layer Working model..."
+cd "Single layer Working model"
+# Run script with correct working directory so it picks up its custom_layer and tuner_model modules
+python mlp_with_custom_layer.py --epochs 5 --batch_size 64 > ../custom_mlp_output.txt
+cd ..
 
 # Summary
 echo "===== EXPERIMENT SUMMARY ====="

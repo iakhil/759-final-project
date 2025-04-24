@@ -4,6 +4,8 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from custom_layer import CustomLinear 
+import os
+from tuner_model_copy import load_model_and_scaler
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -19,6 +21,13 @@ learning_rate = 0.001
 block_x = 16
 block_y = 16
 
+# Load tuner model and scaler
+if os.path.exists('tuner_model.pt'):
+    tuner_model, scaler = load_model_and_scaler('tuner_model.pt', input_dim=12)
+    tuner_model.eval()
+else:
+    raise FileNotFoundError("tuner_model.pt not found")
+
 # Load MNIST dataset
 transform = transforms.ToTensor()
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
@@ -29,10 +38,10 @@ test_loader  = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=F
 
 # Define the MLP with custom first layer
 class MLP(nn.Module):
-    def __init__(self, block_x=16, block_y=16):
+    def __init__(self):
         super(MLP, self).__init__()
         self.layers = nn.Sequential(
-            CustomLinear(input_size, hidden_size1, block_x, block_y),
+            CustomLinear(input_size, hidden_size1, tuner_model, scaler),
             nn.ReLU(),
             nn.Linear(hidden_size1, hidden_size2),
             nn.ReLU(),
@@ -43,7 +52,7 @@ class MLP(nn.Module):
         x = x.view(-1, 28 * 28)
         return self.layers(x)
 
-model = MLP(block_x, block_y).to(device)
+model = MLP().to(device)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()

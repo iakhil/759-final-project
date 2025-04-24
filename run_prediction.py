@@ -2,7 +2,11 @@ import torch
 import os
 import sys
 
-from tuner_model_copy import load_model_and_scaler, predict_best_block_size
+# Add the Single layer Working model directory to the Python path
+sys.path.append(os.path.join(os.getcwd(), "Single layer Working model"))
+
+# Import from the working version instead of the copy
+from tuner_model import load_model_and_scaler, predict_best_block_size
 
 # Matrix dimensions for the first layer
 M = 64  # batch size
@@ -13,11 +17,13 @@ print(f"Predicting optimal block sizes for matrix dimensions: M={M}, K={K}, N={N
 
 # Load tuner model and scaler
 try:
-    model_path = "Single layer Working model/tuner_model.pt"
+    # First try to find the model in the Single layer Working model directory
+    model_path = os.path.join("Single layer Working model", "tuner_model.pt")
+    
     if not os.path.exists(model_path):
         print(f"Warning: Model file {model_path} not found. Checking in alternative locations...")
         
-        # Try to find the model in subdirectories
+        # Try to find the model in other subdirectories
         for root, _, files in os.walk("."):
             if "tuner_model.pt" in files:
                 model_path = os.path.join(root, "tuner_model.pt")
@@ -47,6 +53,8 @@ try:
     print(f"Predicted runtime: {predicted_runtime:.4f} ms")
     
 except Exception as e:
+    import traceback
+    traceback.print_exc()
     print(f"ERROR in prediction: {e}", file=sys.stderr)
     # Fall back to default block sizes
     print("PREDICTION_RESULT: block_x=16, block_y=16")

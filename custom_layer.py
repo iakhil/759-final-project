@@ -42,7 +42,7 @@ class CustomLinear(nn.Module):
         N = self.out_features
 
         # Use the tuner to get best block sizes for this (M, K, N)
-        block_x, block_y, _ = predict_best_block_size(M, K, N, self.tuner_model, self.scaler)
+        block_x, block_y, _ = predict_best_block_size(M, K, N, model=self.tuner_model, scaler=self.scaler)
         block_x = int(block_x)
         block_y = int(block_y)
 
