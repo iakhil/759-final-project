@@ -12,31 +12,28 @@ import argparse
 import torch.cuda
 
 class MLP(nn.Module):
-    def __init__(self, input_size=784, hidden_size=256, tuner_path="tuner_model.pt"):
+    def __init__(self, input_size, hidden_size, output_size, tuner_model=None, scaler=None):
         super(MLP, self).__init__()
-
-        # Load tuner model and scaler
-        if os.path.exists(tuner_path):
-            tuner_model, scaler = load_model_and_scaler(tuner_path, input_dim=12)
-            print(f"Loaded tuner model and scaler from {tuner_path}")
-        else:
-            raise FileNotFoundError(f"Tuner model not found at {tuner_path}")
-
-        self.tuner_model = tuner_model
-        self.scaler = scaler
-        self.tuner_model.eval()
-
-        self.layers = nn.Sequential(
-            CustomLinear(input_size, hidden_size, self.tuner_model, self.scaler),
-            nn.ReLU(),
-            nn.Linear(hidden_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, 10)
-        )
-
+        
+        # Initialize the custom linear layer with the tuner model
+        self.layer1 = CustomLinear(input_size, hidden_size, tuner_model=tuner_model, scaler=scaler)
+        self.relu = nn.ReLU()
+        self.layer2 = nn.Linear(hidden_size, output_size)  # Regular PyTorch linear layer
+        self.input_size = input_size
+    
     def forward(self, x):
-        x = x.view(-1, 28 * 28)
-        return self.layers(x)
+        # Reshape input to ensure correct dimensions
+        batch_size = x.size(0)
+        x = x.view(batch_size, -1)  # Flatten all dimensions except batch
+        
+        # Ensure input has the correct number of features
+        if x.size(1) != self.input_size:
+            raise ValueError(f"Expected input with {self.input_size} features, got {x.size(1)}")
+            
+        x = self.layer1(x)
+        x = self.relu(x)
+        x = self.layer2(x)
+        return x
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -66,7 +63,7 @@ train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=
 test_loader  = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
 
 # Initialize model
-model = MLP(input_size=784, hidden_size=256, tuner_path="tuner_model.pt").to(device)
+model = MLP(input_size=784, hidden_size=256, output_size=10, tuner_model=None, scaler=None).to(device)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()

@@ -30,43 +30,62 @@ class MatMulFunction(Function):
         return grad_A, grad_B, None, None  # block_x and block_y don't require gradients
 
 class CustomLinear(nn.Module):
-    def __init__(self, in_features, out_features, tuner_model=None, default_block_x=16, default_block_y=16):
+    def __init__(self, in_features, out_features, tuner_model=None, scaler=None, block_x=16, block_y=16):
         super(CustomLinear, self).__init__()
         self.weight = nn.Parameter(torch.randn(in_features, out_features) * 0.01)
         self.bias = nn.Parameter(torch.zeros(out_features))
         self.tuner_model = tuner_model
-        self.default_block_x = default_block_x
-        self.default_block_y = default_block_y
+        self.scaler = scaler
+        self.block_x = block_x # Default block size x
+        self.block_y = block_y # Default block size y
         
-        # Fixed properties for the tuner
+        # Save dimensions for prediction
         self.in_features = in_features
         self.out_features = out_features
 
-    def get_block_sizes(self, batch_size):
-        if self.tuner_model is not None:
-            # Create input tensor: [batch_size, in_features, out_features]
-            tuner_input = torch.tensor([batch_size, self.in_features, self.out_features], 
-                                     dtype=torch.float32, device=self.weight.device).unsqueeze(0)
-            
-            # Get predicted block sizes
-            with torch.no_grad():
-                block_sizes = self.tuner_model(tuner_input).squeeze()
-            
-            # Convert to integers and ensure they're positive
-            block_x = max(1, int(block_sizes[0].item()))
-            block_y = max(1, int(block_sizes[1].item()))
-            return block_x, block_y
-        return self.default_block_x, self.default_block_y
-
     def forward(self, x):
-        x = x.contiguous()  # Make sure x is contiguous
-        weight = self.weight.contiguous()
+        # Validate input dimensions
+        if x.dim() != 2:
+            raise ValueError(f"Expected 2D input tensor, got {x.dim()}D tensor")
+        if x.size(1) != self.in_features:
+            raise ValueError(f"Expected input feature dimension {self.in_features}, got {x.size(1)}")
+            
+        x = x.contiguous()  # Ensure x is contiguous
+        weight = self.weight.contiguous() # Ensure weight is contiguous
         
-        # Get batch size (M dimension)
-        batch_size = x.size(0)
+        batch_size = x.size(0) # M dimension for matmul and tuner input
         
-        # Get optimal block sizes for this batch
-        block_x, block_y = self.get_block_sizes(batch_size)
+        # Determine block sizes for CUDA kernel
+        current_block_x = self.block_x
+        current_block_y = self.block_y
+
+        if self.tuner_model is not None and self.scaler is not None:
+            # If tuner model and scaler are provided, predict the best block size
+            try:
+                # Import locally to avoid potential circular dependency issues
+                from tuner_model import predict_best_block_size 
+                
+                # Predict best block size using the tuner model
+                # Passes M, K, N correctly to the prediction function
+                predicted_bx, predicted_by, _ = predict_best_block_size(
+                    M=batch_size, 
+                    K=self.in_features, 
+                    N=self.out_features, 
+                    model=self.tuner_model, 
+                    scaler=self.scaler, 
+                    device=x.device # Ensure prediction runs on the same device
+                )
+                current_block_x = predicted_bx
+                current_block_y = predicted_by
+                
+            except ImportError:
+                 print("Warning: tuner_model.py not found or predict_best_block_size not available. Using default block sizes.")
+            except Exception as e:
+                # Fallback to default block sizes if prediction fails
+                print(f"Error predicting block size: {e}. Using default block sizes ({self.block_x}, {self.block_y}).")
         
-        out = MatMulFunction.apply(x, weight, block_x, block_y)
+        # Apply the custom matrix multiplication function using determined block sizes
+        out = MatMulFunction.apply(x, weight, current_block_x, current_block_y)
+        
+        # Add bias
         return out + self.bias
