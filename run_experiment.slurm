@@ -71,7 +71,8 @@ python mlp.py --epochs 5 --batch_size 64 > standard_mlp_output.txt
 echo "Running custom MLP from Single layer Working model..."
 cd "Single layer Working model"
 # Run script with correct working directory so it picks up its custom_layer and tuner_model modules
-python mlp_with_custom_layer.py --epochs 5 --batch_size 64 > ../custom_mlp_output.txt
+# Pass the predicted block sizes as arguments
+python mlp_with_custom_layer.py --epochs 5 --batch_size 64 --block_x $BLOCK_X --block_y $BLOCK_Y > ../custom_mlp_output.txt
 cd ..
 
 # Summary
