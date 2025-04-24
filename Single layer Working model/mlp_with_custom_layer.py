@@ -130,12 +130,8 @@ avg_epoch_time = sum(epoch_times) / len(epoch_times)
 avg_forward_time = sum(forward_times) / len(forward_times)
 avg_backward_time = sum(backward_times) / len(backward_times)
 
-print("\n===== CUSTOM MLP PERFORMANCE =====")
-print(f"Block size configuration: ({block_x}, {block_y})")
-print(f"Total training time: {total_time:.2f} seconds")
-print(f"Average epoch time: {avg_epoch_time:.2f} seconds")
-print(f"Average forward pass time: {avg_forward_time:.2f} ms")
-print(f"Average backward pass time: {avg_backward_time:.2f} ms")
+# Initialize accuracy variable
+test_accuracy = 0.0
 
 # Evaluation
 model.eval()
@@ -149,7 +145,17 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-    print(f'Accuracy on test set: {100 * correct / total:.2f}%')
+    if total > 0:
+        test_accuracy = 100 * correct / total
+    # print(f'Accuracy on test set: {test_accuracy:.2f}%') # Keep this print or remove, up to user preference
+
+print("\n===== CUSTOM MLP PERFORMANCE =====")
+print(f"Block size configuration: ({block_x}, {block_y})")
+print(f"Total training time: {total_time:.2f} seconds")
+print(f"Average epoch time: {avg_epoch_time:.2f} seconds")
+print(f"Average forward pass time: {avg_forward_time:.2f} ms")
+print(f"Average backward pass time: {avg_backward_time:.2f} ms")
+print(f"Accuracy on test set: {test_accuracy:.2f}%") # Added accuracy here
 
 # Save the model
 torch.save(model.state_dict(), "mlp_with_custom_layer.pt")
