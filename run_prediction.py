@@ -6,7 +6,7 @@ import sys
 sys.path.append(os.path.join(os.getcwd(), "Single layer Working model"))
 
 # Import from the working version instead of the copy
-from tuner_model import load_model_and_scaler, predict_best_block_size
+from tuner_model_copy import load_model_and_scaler, predict_best_block_size
 
 # Matrix dimensions for the first layer
 M = 64  # batch size

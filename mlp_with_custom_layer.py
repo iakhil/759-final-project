@@ -87,6 +87,6 @@ with torch.no_grad():
 
     print(f'Accuracy on test set: {100 * correct / total:.2f}%')
 
-# ✅ Save the model
+
 torch.save(model.state_dict(), "mlp_with_custom_layer.pt")
 print("Model saved to mlp_with_custom_layer.pt")
