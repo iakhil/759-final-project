@@ -19,6 +19,13 @@ echo "Activating Conda environment..."
 source ~/.bashrc
 conda activate myenv || (conda create -n myenv python=3.10 -y && conda activate myenv)
 
+# Remove ninja to prevent its use
+echo "Removing ninja from environment..."
+conda remove -y ninja || echo "ninja not installed, skipping removal"
+
+# Explicitly disable Ninja for PyTorch extensions
+export USE_NINJA=0
+
 # Install Python packages
 echo "Installing Python packages..."
 pip install --upgrade pip
