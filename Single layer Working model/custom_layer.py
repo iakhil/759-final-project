@@ -89,3 +89,4 @@ class CustomLinear(nn.Module):
         
         # Add bias
         return out + self.bias
+        

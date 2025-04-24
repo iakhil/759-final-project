@@ -72,52 +72,59 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 # Training loop with timing and CSV logging
 csv_path = "training_log.csv"
 
+# Open the CSV file and keep it open for the duration of the training loop
 with open(csv_path, "w", newline="") as f:
     writer = csv.writer(f)
+    # Write the header row
     writer.writerow(["epoch", "batch", "loss", "time_ms"])
 
-# Add timing variables
-start_time = time.time()
-epoch_times = []
-forward_times = []
-backward_times = []
+    # Add timing variables
+    start_time = time.time()
+    epoch_times = []
+    forward_times = []
+    backward_times = []
 
-for epoch in range(num_epochs):
-    epoch_start = time.time()
-    model.train()
-    for batch_idx, (images, labels) in enumerate(train_loader):
-        images, labels = images.to(device), labels.to(device)
+    # Main training loop - now inside the 'with' block
+    for epoch in range(num_epochs):
+        epoch_start = time.time()
+        model.train()
+        for batch_idx, (images, labels) in enumerate(train_loader):
+            images, labels = images.to(device), labels.to(device)
 
-        # Time forward pass
-        start_event = torch.cuda.Event(enable_timing=True)
-        end_event = torch.cuda.Event(enable_timing=True)
-        
-        start_event.record()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        end_event.record()
-        
-        torch.cuda.synchronize()
-        forward_times.append(start_event.elapsed_time(end_event))
-        
-        # Time backward pass
-        start_event.record()
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        end_event.record()
-        
-        torch.cuda.synchronize()
-        backward_times.append(start_event.elapsed_time(end_event))
+            # Time forward pass
+            start_event = torch.cuda.Event(enable_timing=True)
+            end_event = torch.cuda.Event(enable_timing=True)
+            
+            start_event.record()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            end_event.record()
+            
+            torch.cuda.synchronize()
+            forward_times.append(start_event.elapsed_time(end_event))
+            
+            # Time backward pass
+            start_event.record()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            end_event.record()
+            
+            torch.cuda.synchronize()
+            backward_times.append(start_event.elapsed_time(end_event))
 
-        writer.writerow([epoch+1, batch_idx+1, loss.item(), (end_event.elapsed_time(start_event)*1000)])
+            # Write data for the current batch to the CSV file
+            writer.writerow([epoch+1, batch_idx+1, loss.item(), (end_event.elapsed_time(start_event)*1000)])
 
-    epoch_end = time.time()
-    epoch_time = epoch_end - epoch_start
-    epoch_times.append(epoch_time)
-    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Time: {epoch_time:.2f}s")
+        epoch_end = time.time()
+        epoch_time = epoch_end - epoch_start
+        epoch_times.append(epoch_time)
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Time: {epoch_time:.2f}s")
 
-# After training, add timing statistics
+# The 'with' block ends here, and the CSV file 'f' is automatically closed.
+
+# After training, calculate and print timing statistics
+# These calculations happen *after* the file is closed, which is fine.
 total_time = time.time() - start_time
 avg_epoch_time = sum(epoch_times) / len(epoch_times)
 avg_forward_time = sum(forward_times) / len(forward_times)
