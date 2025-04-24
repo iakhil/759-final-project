@@ -82,6 +82,6 @@ echo "Standard MLP results:"
 grep "STANDARD MLP PERFORMANCE" -A 5 standard_mlp_output.txt || echo "No results"
 
 echo "Custom MLP results:"
-grep "CUSTOM MLP PERFORMANCE" -A 5 custom_mlp_output.txt || echo "No results"
+grep "CUSTOM MLP PERFORMANCE" -A 6 custom_mlp_output.txt || echo "No results"
 
 echo "Completed at $(date)"

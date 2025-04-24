@@ -149,7 +149,7 @@ with torch.no_grad():
         test_accuracy = 100 * correct / total
     # print(f'Accuracy on test set: {test_accuracy:.2f}%') # Keep this print or remove, up to user preference
 
-print("\n===== CUSTOM MLP PERFORMANCE =====")
+print("\n===== CUSTOM MLP PERFORMANCE WITH PREDICTED BLOCK SIZE =====")
 print(f"Block size configuration: ({block_x}, {block_y})")
 print(f"Total training time: {total_time:.2f} seconds")
 print(f"Average epoch time: {avg_epoch_time:.2f} seconds")
