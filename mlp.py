@@ -10,14 +10,20 @@ import argparse
 import torch.cuda
 
 # Device configuration
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # Original logic
 
 # Add command-line argument parsing
 parser = argparse.ArgumentParser(description='Train a standard MLP on MNIST')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
 parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
 parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', 
+                    choices=['cuda', 'cpu'], help='Device to run the training on (cuda or cpu)') # Added device argument
 args = parser.parse_args()
+
+# Set device based on argument
+device = torch.device(args.device)
+print(f"Using device: {device}") # Added print statement for confirmation
 
 # Update hyperparameters
 input_size = 784  # 28x28 images
