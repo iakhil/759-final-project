@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=cpu_benchmark
-#SBATCH --output=cpu_benchmark_%j.out
-#SBATCH --error=cpu_benchmark_%j.err
-#SBATCH --time=00:30:00
+#SBATCH --job-name=cpu_inference
+#SBATCH --output=cpu_inference_%j.out
+#SBATCH --error=cpu_inference_%j.err
+#SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -19,14 +19,10 @@ conda activate myenv || conda create -n myenv python=3.10 -y && conda activate m
 
 # Install Python packages (once)
 pip install --upgrade pip
-pip install torch torchvision numpy
+pip install torch torchvision numpy matplotlib
 
 # Confirm environment
 python -c "import torch, numpy; print('Torch:', torch.__version__, '| NumPy:', numpy.__version__)"
 
-# Build CUDA extension
-python setup.py build_ext --inplace
-
-
-# Run the benchmark
-python benchmark_pytorch_vs_custom.py 
+# Run the inference benchmark
+python benchmark_inference_cpu.py 
