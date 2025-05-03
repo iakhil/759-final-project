@@ -1,13 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=cpu_inference
-#SBATCH --output=cpu_inference_%j.out
-#SBATCH --error=cpu_inference_%j.err
+#SBATCH --job-name=train_benchmark
+#SBATCH --output=train_benchmark_%j.out
+#SBATCH --error=train_benchmark_%j.err
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --partition=instruction
+#SBATCH --gres=gpu:1
 
 # Load modules
 module load nvidia/cuda/12.2.0
@@ -21,8 +22,8 @@ conda activate myenv || conda create -n myenv python=3.10 -y && conda activate m
 pip install --upgrade pip
 pip install torch torchvision numpy matplotlib
 
-# Confirm environment
-python -c "import torch, numpy; print('Torch:', torch.__version__, '| NumPy:', numpy.__version__)"
+# Confirm environment and CUDA availability
+python -c "import torch; print('Torch:', torch.__version__, '| CUDA available:', torch.cuda.is_available(), '| Device count:', torch.cuda.device_count())"
 
-# Run the inference benchmark
+# Run the benchmark comparing PyTorch on CPU vs Custom on GPU - training metrics
 python benchmark_inference_cpu.py 
