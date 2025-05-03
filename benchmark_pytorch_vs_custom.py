@@ -5,12 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os
+from torch.utils.data import DataLoader, TensorDataset
+from torchvision import datasets, transforms
 
 # Add the "Single layer Working model" directory to the path
 single_layer_dir = os.path.join(os.getcwd(), "Single layer Working model")
 sys.path.insert(0, single_layer_dir)  # Prioritize this path over others
 
-# Import CPU custom layer
+# Import CPU matrix multiplication function
 from cpu_custom_layer import CPUMatMulFunction
 
 # Import from Single layer Working model/tuner_model.py
@@ -27,15 +29,16 @@ spec.loader.exec_module(tuner_module)
 load_model_and_scaler = tuner_module.load_model_and_scaler
 predict_best_block_size = tuner_module.predict_best_block_size
 
-# Configure the device - we'll run both on CPU for fair comparison
+# Force CPU usage
 device = torch.device("cpu")
 
-# Constants for the benchmark
-BATCH_SIZES = [1, 8, 16, 32, 64, 128, 256, 512]
+# Training parameters
+BATCH_SIZE = 64
+NUM_EPOCHS = 5
+LEARNING_RATE = 0.001
 INPUT_FEATURES = 784  # MNIST input size (28x28)
 HIDDEN_FEATURES = 256  # Hidden layer size
 NUM_CLASSES = 10
-NUM_RUNS = 10  # Number of runs for each configuration to get an average
 
 # Load tuner model to predict block sizes
 print("Loading tuner model...")
@@ -130,110 +133,197 @@ class CustomMLP(nn.Module):
         x = self.fc2(x)
         return x
 
-def benchmark_models():
-    results = {'batch_size': [], 'pytorch_time': [], 'custom_time': [], 'speedup': [], 'block_x': [], 'block_y': []}
+def load_data():
+    """Load MNIST dataset for training and testing"""
+    # Define transforms
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
     
-    for batch_size in BATCH_SIZES:
-        print(f"Benchmarking with batch size: {batch_size}")
-        
-        # Create input data
-        x = torch.randn(batch_size, INPUT_FEATURES, device=device)
-        
-        # Initialize the models
-        pytorch_model = PyTorchMLP(INPUT_FEATURES, HIDDEN_FEATURES, NUM_CLASSES).to(device)
-        custom_model = CustomMLP(INPUT_FEATURES, HIDDEN_FEATURES, NUM_CLASSES, tuner_model, scaler).to(device)
-        
-        # Record the block sizes predicted by the model
-        block_x, block_y, _ = predict_best_block_size(
-            M=batch_size, 
-            K=INPUT_FEATURES, 
-            N=HIDDEN_FEATURES, 
-            model=tuner_model, 
-            scaler=scaler, 
-            device=device
-        )
-        
-        # Warm-up runs
-        for _ in range(3):
-            _ = pytorch_model(x)
-            _ = custom_model(x)
-        
-        # Benchmark PyTorch model
-        pytorch_times = []
-        for _ in range(NUM_RUNS):
-            start = time.time()
-            _ = pytorch_model(x)
-            end = time.time()
-            pytorch_times.append((end - start) * 1000)  # ms
-        
-        # Benchmark Custom model
-        custom_times = []
-        for _ in range(NUM_RUNS):
-            start = time.time()
-            _ = custom_model(x)
-            end = time.time()
-            custom_times.append((end - start) * 1000)  # ms
-        
-        # Calculate averages
-        avg_pytorch_time = np.mean(pytorch_times)
-        avg_custom_time = np.mean(custom_times)
-        speedup = avg_pytorch_time / avg_custom_time if avg_custom_time > 0 else float('inf')
-        
-        # Store results
-        results['batch_size'].append(batch_size)
-        results['pytorch_time'].append(avg_pytorch_time)
-        results['custom_time'].append(avg_custom_time)
-        results['speedup'].append(speedup)
-        results['block_x'].append(block_x)
-        results['block_y'].append(block_y)
-        
-        print(f"  PyTorch time: {avg_pytorch_time:.4f} ms")
-        print(f"  Custom time: {avg_custom_time:.4f} ms")
-        print(f"  Speedup: {speedup:.2f}x")
-        print(f"  Block sizes: ({block_x}, {block_y})")
-        print()
+    # Load datasets
+    train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
+    test_dataset = datasets.MNIST('./data', train=False, transform=transform)
     
-    return results
+    # Create data loaders
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    
+    return train_loader, test_loader
 
-def plot_results(results):
-    # Create figure with two subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+def train_model(model_name, model, train_loader, test_loader):
+    """Train the model with detailed timing measurements"""
     
-    # Plot 1: Runtime comparison
-    ax1.plot(results['batch_size'], results['pytorch_time'], 'o-', label='PyTorch CPU')
-    ax1.plot(results['batch_size'], results['custom_time'], 's-', label='Custom with Predicted Blocks')
-    ax1.set_xscale('log', base=2)
-    ax1.set_yscale('log')
-    ax1.set_xlabel('Batch Size')
-    ax1.set_ylabel('Time (ms)')
-    ax1.set_title('Runtime Comparison: PyTorch vs Custom Implementation')
-    ax1.grid(True, which='both', linestyle='--', alpha=0.6)
-    ax1.legend()
+    print(f"\n{'='*20} Training {model_name} {'='*20}")
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
-    # Plot 2: Speedup and block sizes
-    ax2.bar(range(len(results['batch_size'])), results['speedup'], label='Speedup')
-    ax2.set_xticks(range(len(results['batch_size'])))
-    ax2.set_xticklabels([f"{bs}\n({bx},{by})" for bs, bx, by in 
-                         zip(results['batch_size'], results['block_x'], results['block_y'])])
-    ax2.set_xlabel('Batch Size (with Block Sizes)')
-    ax2.set_ylabel('Speedup (x times)')
-    ax2.set_title('Speedup with Predicted Block Sizes')
-    ax2.grid(True, linestyle='--', alpha=0.6)
+    # Timing variables
+    total_train_start = time.time()
+    epoch_times = []
+    forward_pass_times = []
+    backward_pass_times = []
     
-    plt.tight_layout()
-    plt.savefig('benchmark_results.png')
-    print("Results plot saved as 'benchmark_results.png'")
+    for epoch in range(NUM_EPOCHS):
+        epoch_start = time.time()
+        
+        # Training
+        model.train()
+        running_loss = 0.0
+        batch_count = 0
+        
+        for batch_idx, (data, target) in enumerate(train_loader):
+            data, target = data.to(device), target.to(device)
+            data = data.view(-1, INPUT_FEATURES)  # Flatten the images
+            
+            # Forward pass timing
+            forward_start = time.time()
+            outputs = model(data)
+            loss = criterion(outputs, target)
+            forward_end = time.time()
+            forward_pass_times.append(forward_end - forward_start)
+            
+            # Backward pass timing
+            backward_start = time.time()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            backward_end = time.time()
+            backward_pass_times.append(backward_end - backward_start)
+            
+            running_loss += loss.item()
+            batch_count += 1
+            
+            # Print batch progress for every 100 batches
+            if batch_idx % 100 == 0:
+                print(f"Epoch {epoch+1}/{NUM_EPOCHS}, Batch {batch_idx}/{len(train_loader)}, "
+                      f"Loss: {loss.item():.4f}, Avg Forward: {np.mean(forward_pass_times[-100:]) * 1000:.2f}ms, "
+                      f"Avg Backward: {np.mean(backward_pass_times[-100:]) * 1000:.2f}ms")
+        
+        epoch_end = time.time()
+        epoch_time = epoch_end - epoch_start
+        epoch_times.append(epoch_time)
+        
+        # Validate after each epoch
+        model.eval()
+        val_loss = 0
+        correct = 0
+        with torch.no_grad():
+            for data, target in test_loader:
+                data, target = data.to(device), target.to(device)
+                data = data.view(-1, INPUT_FEATURES)
+                output = model(data)
+                val_loss += criterion(output, target).item()
+                pred = output.argmax(dim=1, keepdim=True)
+                correct += pred.eq(target.view_as(pred)).sum().item()
+                
+        val_loss /= len(test_loader.dataset)
+        accuracy = 100. * correct / len(test_loader.dataset)
+        
+        print(f"Epoch {epoch+1}/{NUM_EPOCHS} completed in {epoch_time:.2f}s | "
+              f"Loss: {running_loss/batch_count:.4f} | "
+              f"Validation Accuracy: {accuracy:.2f}%")
     
-    # Also display the numerical results in a readable format
-    print("\n----- Benchmark Results Summary -----")
-    print(f"{'Batch Size':<10} | {'PyTorch (ms)':<12} | {'Custom (ms)':<12} | {'Speedup':<8} | {'Block Sizes':<10}")
-    print("-" * 60)
-    for i in range(len(results['batch_size'])):
-        print(f"{results['batch_size'][i]:<10} | {results['pytorch_time'][i]:<12.4f} | "
-              f"{results['custom_time'][i]:<12.4f} | {results['speedup'][i]:<8.2f} | "
-              f"({results['block_x'][i]}, {results['block_y'][i]})")
+    # Calculate final test accuracy
+    model.eval()
+    test_loss = 0
+    correct = 0
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            data = data.view(-1, INPUT_FEATURES)
+            output = model(data)
+            test_loss += criterion(output, target).item()
+            pred = output.argmax(dim=1, keepdim=True)
+            correct += pred.eq(target.view_as(pred)).sum().item()
+    
+    test_loss /= len(test_loader.dataset)
+    test_accuracy = 100. * correct / len(test_loader.dataset)
+    
+    total_train_end = time.time()
+    total_train_time = total_train_end - total_train_start
+    avg_epoch_time = np.mean(epoch_times)
+    avg_forward_time = np.mean(forward_pass_times) * 1000  # Convert to ms
+    avg_backward_time = np.mean(backward_pass_times) * 1000  # Convert to ms
+    
+    # Print the final results
+    print(f"\n{'='*20} {model_name} Results {'='*20}")
+    print(f"Total Training Time: {total_train_time:.2f} seconds")
+    print(f"Average Epoch Time: {avg_epoch_time:.2f} seconds")
+    print(f"Average Forward Pass Time: {avg_forward_time:.4f} ms")
+    print(f"Average Backward Pass Time: {avg_backward_time:.4f} ms")
+    print(f"Test Accuracy: {test_accuracy:.2f}%")
+    print(f"Test Loss: {test_loss:.4f}")
+    
+    return {
+        'name': model_name,
+        'total_train_time': total_train_time,
+        'avg_epoch_time': avg_epoch_time,
+        'avg_forward_time': avg_forward_time,
+        'avg_backward_time': avg_backward_time, 
+        'test_accuracy': test_accuracy,
+        'test_loss': test_loss
+    }
+
+def compare_results(pytorch_results, custom_results):
+    """Compare and display the results of both models"""
+    print("\n" + "="*60)
+    print(f"{'Metric':<25} | {'PyTorch':<15} | {'Custom':<15} | {'Ratio':<10}")
+    print("-"*60)
+    
+    # Calculate ratios (custom/pytorch)
+    metrics = [
+        ('Total Training Time (s)', pytorch_results['total_train_time'], custom_results['total_train_time']),
+        ('Avg Epoch Time (s)', pytorch_results['avg_epoch_time'], custom_results['avg_epoch_time']),
+        ('Avg Forward Pass (ms)', pytorch_results['avg_forward_time'], custom_results['avg_forward_time']),
+        ('Avg Backward Pass (ms)', pytorch_results['avg_backward_time'], custom_results['avg_backward_time']),
+        ('Test Accuracy (%)', pytorch_results['test_accuracy'], custom_results['test_accuracy']),
+        ('Test Loss', pytorch_results['test_loss'], custom_results['test_loss'])
+    ]
+    
+    for metric, pytorch_val, custom_val in metrics:
+        ratio = custom_val / pytorch_val if pytorch_val != 0 else float('inf')
+        print(f"{metric:<25} | {pytorch_val:<15.4f} | {custom_val:<15.4f} | {ratio:<10.4f}")
+    
+    print("="*60)
+    
+    # Save results to CSV
+    with open('detailed_benchmark_results.csv', 'w') as f:
+        f.write('Metric,PyTorch,Custom,Ratio\n')
+        for metric, pytorch_val, custom_val in metrics:
+            ratio = custom_val / pytorch_val if pytorch_val != 0 else float('inf')
+            f.write(f"{metric},{pytorch_val},{custom_val},{ratio}\n")
+    
+    print("Detailed results saved to 'detailed_benchmark_results.csv'")
 
 if __name__ == "__main__":
-    print("Starting benchmark: PyTorch CPU vs Custom MLP with optimal block sizes")
-    results = benchmark_models()
-    plot_results(results) 
+    print(f"Starting benchmark on CPU: PyTorch vs Custom MLP with optimal block sizes")
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"Device: {device}")
+    
+    # Get the block sizes predicted by the model
+    print("Predicting optimal block sizes for benchmark batch size...")
+    block_x, block_y, _ = predict_best_block_size(
+        M=BATCH_SIZE, 
+        K=INPUT_FEATURES, 
+        N=HIDDEN_FEATURES, 
+        model=tuner_model, 
+        scaler=scaler, 
+        device=device
+    )
+    print(f"Using block sizes: ({block_x}, {block_y}) for batch size {BATCH_SIZE}")
+    
+    # Load MNIST data
+    print("Loading MNIST dataset...")
+    train_loader, test_loader = load_data()
+    
+    # Initialize models
+    pytorch_model = PyTorchMLP(INPUT_FEATURES, HIDDEN_FEATURES, NUM_CLASSES).to(device)
+    custom_model = CustomMLP(INPUT_FEATURES, HIDDEN_FEATURES, NUM_CLASSES, tuner_model, scaler).to(device)
+    
+    # Train and evaluate models
+    pytorch_results = train_model("PyTorch MLP", pytorch_model, train_loader, test_loader)
+    custom_results = train_model("Custom MLP", custom_model, train_loader, test_loader)
+    
+    # Compare results
+    compare_results(pytorch_results, custom_results) 
